@@ -1,0 +1,49 @@
+name: app-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "charts/**"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ECR: 123456789012.dkr.ecr.us-east-1.amazonaws.com/orders-api
+  CLUSTER: learning-prod
+  REGION: us-east-1
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/orders-api-deploy
+          aws-region: ${{ env.REGION }}
+      - name: Login to ECR
+        run: aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR
+      - name: Build image
+        run: docker build -t $ECR:${{ github.sha }} ./app
+      - name: Scan image (fail on critical)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR }}:${{ github.sha }}
+          severity: CRITICAL
+          exit-code: "1"
+      - name: Push image
+        run: docker push $ECR:${{ github.sha }}
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name $CLUSTER --region $REGION
+      - name: Deploy
+        run: |
+          helm upgrade --install orders-api ./charts/orders-api \
+            --namespace production \
+            --values ./charts/orders-api/values-prod.yaml \
+            --set image.tag=${{ github.sha }} \
+            --atomic --wait

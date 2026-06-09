@@ -1,0 +1,6 @@
+apiVersion: v2
+name: orders-api
+description: The orders API service (companion chart for Chapter 12)
+type: application
+version: 1.0.0
+appVersion: "1.4.0"

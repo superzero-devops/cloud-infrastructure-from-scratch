@@ -1,0 +1,16 @@
+# Tells Prometheus (kube-prometheus-stack) to scrape the app (Chapter 13).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: orders-api
+  namespace: production
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: orders-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

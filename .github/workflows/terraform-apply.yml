@@ -1,0 +1,82 @@
+name: terraform-apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "services/**"
+      - "envs/**"
+      - "backends/**"
+
+permissions:
+  id-token: write
+  contents: read
+
+# Promotion chain: dev, then staging, then prod (prod gated by a required reviewer
+# on the GitHub "production" environment). VPC applies before EKS in each stage.
+jobs:
+  dev:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/learning-terraform-apply-dev
+          aws-region: us-east-1
+      - name: Apply VPC
+        working-directory: services/vpc
+        run: |
+          terraform init -backend-config=../../backends/vpc-dev.hcl
+          terraform apply -auto-approve -var-file=../../envs/dev.tfvars
+      - name: Apply EKS
+        working-directory: services/eks
+        run: |
+          terraform init -backend-config=../../backends/eks-dev.hcl
+          terraform apply -auto-approve -var-file=../../envs/dev.tfvars
+
+  staging:
+    needs: dev
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/learning-terraform-apply-staging
+          aws-region: us-east-1
+      - name: Apply VPC
+        working-directory: services/vpc
+        run: |
+          terraform init -backend-config=../../backends/vpc-staging.hcl
+          terraform apply -auto-approve -var-file=../../envs/staging.tfvars
+      - name: Apply EKS
+        working-directory: services/eks
+        run: |
+          terraform init -backend-config=../../backends/eks-staging.hcl
+          terraform apply -auto-approve -var-file=../../envs/staging.tfvars
+
+  prod:
+    needs: staging
+    runs-on: ubuntu-latest
+    environment: production   # set a required reviewer on this environment in repo settings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/learning-terraform-apply-prod
+          aws-region: us-east-1
+      - name: Apply VPC
+        working-directory: services/vpc
+        run: |
+          terraform init -backend-config=../../backends/vpc-prod.hcl
+          terraform apply -auto-approve -var-file=../../envs/prod.tfvars
+      - name: Apply EKS
+        working-directory: services/eks
+        run: |
+          terraform init -backend-config=../../backends/eks-prod.hcl
+          terraform apply -auto-approve -var-file=../../envs/prod.tfvars

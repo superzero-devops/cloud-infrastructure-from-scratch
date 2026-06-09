@@ -1,0 +1,25 @@
+# Least-privilege read-only access to the production namespace for developers.
+# See Chapter 13.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: production
+  name: developer-readonly
+rules:
+  - apiGroups: ["", "apps"]
+    resources: ["pods", "pods/log", "deployments", "services"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: production
+  name: developers-readonly
+subjects:
+  - kind: Group
+    name: developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer-readonly
+  apiGroup: rbac.authorization.k8s.io

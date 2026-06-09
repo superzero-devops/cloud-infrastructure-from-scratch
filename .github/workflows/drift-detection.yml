@@ -1,0 +1,45 @@
+name: drift-detection
+
+on:
+  schedule:
+    - cron: "0 13 * * 1-5"   # weekday mornings, UTC
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [dev, staging, prod]
+        service: [vpc, eks]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/learning-terraform-plan
+          aws-region: us-east-1
+      - name: Init
+        working-directory: services/${{ matrix.service }}
+        run: terraform init -backend-config=../../backends/${{ matrix.service }}-${{ matrix.env }}.hcl
+      - name: Plan (detect drift)
+        id: plan
+        continue-on-error: true
+        working-directory: services/${{ matrix.service }}
+        run: terraform plan -detailed-exitcode -input=false -var-file=../../envs/${{ matrix.env }}.tfvars
+      - name: Open issue on drift
+        if: steps.plan.outputs.exitcode == 2
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Drift detected: ${{ matrix.service }} / ${{ matrix.env }}`,
+              body: "Terraform plan returned changes for ${{ matrix.service }} in ${{ matrix.env }}. Review and reconcile."
+            })

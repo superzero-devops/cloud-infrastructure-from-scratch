@@ -1,0 +1,4 @@
+# Production overrides. Most values come from values.yaml.
+replicaCount: 3
+ingress:
+  host: api.example.com

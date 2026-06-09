@@ -1,0 +1,5 @@
+project      = "orders-platform"
+environment  = "staging"
+owner        = "platform-team"
+region       = "us-east-1"
+cluster_name = "learning-staging"

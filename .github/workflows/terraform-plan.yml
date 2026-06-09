@@ -1,0 +1,39 @@
+name: terraform-plan
+
+on:
+  pull_request:
+    paths:
+      - "modules/**"
+      - "services/**"
+      - "envs/**"
+      - "backends/**"
+
+permissions:
+  id-token: write   # OIDC, no stored AWS keys
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [dev, staging, prod]
+        service: [vpc, eks]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/learning-terraform-plan
+          aws-region: us-east-1
+      - name: Format check
+        run: terraform fmt -check -recursive
+      - name: Init
+        working-directory: services/${{ matrix.service }}
+        run: terraform init -backend-config=../../backends/${{ matrix.service }}-${{ matrix.env }}.hcl
+      - name: Validate
+        working-directory: services/${{ matrix.service }}
+        run: terraform validate
+      - name: Plan
+        working-directory: services/${{ matrix.service }}
+        run: terraform plan -input=false -var-file=../../envs/${{ matrix.env }}.tfvars

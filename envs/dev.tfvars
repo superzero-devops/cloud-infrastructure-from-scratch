@@ -1,0 +1,5 @@
+project      = "orders-platform"
+environment  = "dev"
+owner        = "platform-team"
+region       = "us-east-1"
+cluster_name = "learning-dev"
